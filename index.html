@@ -312,7 +312,7 @@ function monthSum(mdoc, lmap, mk){
 
 /* ---------- toast & helpers ---------- */
 let tt; function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 3200); }
-const TEAMS = ['NIPT','Pathogen','Service','ศูนย์สกัด','บริหาร'];
+const TEAMS = ['ศูนย์สกัดฯ', 'PGx Service', 'NIPT', 'ผูกพันธุ์', 'Pathogen', 'PGx-LRs', 'บริหารฯ'];
 const fullName = e => e ? [e.first, e.last].filter(Boolean).join(' ').trim() : '';
 const name = uid => { if (!uid) return ''; uid = String(uid); if (uid.includes('@')){ const e = S.emps.find(x => (x.email||'') === uid) || (uid === S.email ? S.me : null); return fullName(e) || (S.names && S.names[uid]) || uid; }
   const e = S.emps.find(x => x.id === uid) || (uid === S.uid ? S.me : null); return fullName(e) || (uid === S.uid ? S.gname : '') || 'พนักงาน'; };
