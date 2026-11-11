@@ -557,7 +557,7 @@ function vLeave(){
       return `<div class="item"><div class="grow"><div class="t">${LT[L.type]||'ลา'} · ${leaveAmt(L)} วัน</div>
         ${p && p.unpaid ? `<div class="small" style="color:var(--warn)">ได้ค่าจ้าง ${p.paid} วัน · ไม่ได้ค่าจ้าง ${p.unpaid} วัน</div>` : ''}
         <div class="small muted mono">${thDate(L.from)}${L.to!==L.from?' – '+thDate(L.to):''}${L.half&&L.from===L.to?' (ครึ่งวัน)':''}</div>
-        ${L.reason ? `<div class="small">${esc(L.reason)}</div>` : ''}${a && (a.by || a.note) ? `<div class="small muted">${a.by ? `พิจารณาโดย ${esc(name(a.by))}` : ''}${a.note ? ` · ${esc(a.note)}` : ''}</div>` : ''}</div>
+        ${L.reason ? `<div class="small">${esc(L.reason)}</div>` : ''}${decidedBy(a, s)}</div>
         <div class="row">${stChip(s)}${s==='pending'?`<button class="btn sm ghost" data-act="cancelLeave" data-lid="${lid}">ยกเลิก</button>`:''}</div></div>`; }).join('')
       : `<div class="card empty"><strong>ยังไม่มีใบลาในปีนี้</strong>กรอกแบบฟอร์มด้านบนเพื่อยื่นใบลา ผู้ดูแลจะได้รับรายการทันที</div>`}
   </section>`;
@@ -613,7 +613,32 @@ function vReportLeave(){
     <div class="tile ${tot.unpaid?'warn':''}"><div class="k">ลาไม่ได้ค่าจ้าง</div><div class="v">${tot.unpaid}<small>วัน</small></div></div>
     <div class="tile ${pendingCount()?'warn':''}"><div class="k">รออนุมัติ</div><div class="v">${pendingCount()}<small>ใบ</small></div></div>
   </div>
-  <div class="tbl"><table><thead><tr><th>ชื่อ-นามสกุล</th><th>ทีม</th>${types.map(t => `<th class="num">${esc(LV[t].n)}</th>`).join('')}<th class="num">รวมเดือนนี้</th><th class="num">ไม่ได้ค่าจ้าง</th><th class="num">รวมทั้งปี ${+y+543}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  <div class="tbl"><table><thead><tr><th>ชื่อ-นามสกุล</th><th>ทีม</th>${types.map(t => `<th class="num">${esc(LV[t].n)}</th>`).join('')}<th class="num">รวมเดือนนี้</th><th class="num">ไม่ได้ค่าจ้าง</th><th class="num">รวมทั้งปี ${+y+543}</th></tr></thead><tbody>${rows}</tbody></table></div>
+  ${leaveListBlock(mk)}`;
+}
+/* รายการใบลาที่ตรงกับเดือนที่เลือก พร้อมผู้อนุมัติ */
+function leaveRows(mk){
+  const y = mk.slice(0,4), last = `${mk}-${pad(daysIn(mk))}`; const out = [];
+  for (const e of shown()){
+    const lv = (S.lv[e.id]||{})[y], ap = (S.apv[e.id]||{})[y];
+    for (const [lid, L] of Object.entries((lv && lv.items) || {})){
+      if (L.to < mk + '-01' || L.from > last) continue;
+      const st = leaveStatus(lid, L, ap); useSched(e.id);
+      out.push({e, lid, L, st, a: ap && ap.items && ap.items[lid]});
+    }
+  }
+  return out.sort((p, q) => p.L.from.localeCompare(q.L.from) || fullName(p.e).localeCompare(fullName(q.e), 'th'));
+}
+function leaveListBlock(mk){
+  const list = leaveRows(mk);
+  const rows = list.map(x => `<tr><td class="mono small">${thDate(x.L.from)}${x.L.to !== x.L.from ? ' – ' + thDate(x.L.to) : ''}</td><td>${esc(name(x.e.id))}</td><td>${esc(x.e.team||'–')}</td>
+    <td>${LT[x.L.type]||'ลา'}${halfOf(x.L) === 0.5 ? ' (ครึ่งวัน)' : ''}</td><td class="num">${leaveAmt(x.L)}</td><td>${stChip(x.st)}</td>
+    <td>${x.a && x.a.by ? esc(name(x.a.by)) : (x.st === 'cancelled' ? '<span class="muted">พนักงานยกเลิกเอง</span>' : '<span class="muted">–</span>')}</td>
+    <td class="small muted">${x.a && x.a.at ? `${thDate(dKey(x.a.at))} ${hm(x.a.at)} น.` : ''}</td><td class="note">${esc((x.a && x.a.note) || '')}</td></tr>`).join('');
+  return `<section class="list"><div class="row between"><div><h2>รายการใบลา</h2><p class="sub">ใบลาที่มีวันลาใน${thMonth(mk)} ทุกสถานะ พร้อมผู้อนุมัติ</p></div>
+    <button class="btn sm" data-act="csv" data-kind="list">ส่งออกรายการใบลา CSV</button></div>
+    ${list.length ? `<div class="tbl"><table><thead><tr><th>วันที่ลา</th><th>ชื่อ-นามสกุล</th><th>ทีม</th><th>ประเภท</th><th class="num">วัน</th><th>สถานะ</th><th>ผู้อนุมัติ</th><th>อนุมัติเมื่อ</th><th>ข้อความ</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<div class="card empty"><strong>ไม่มีใบลาในเดือนนี้</strong></div>'}</section>`;
 }
 function vReport(){
   if (!attOn()) return vReportLeave();
@@ -733,6 +758,12 @@ function longBreak(uid, L, lid){
   let hol = 0; for (let d = a; d <= b; d = addDays(d, 1)) if (S.hol[d]) hol++;
   return {from:a, to:b, total, hol};
 }
+/* บรรทัด "อนุมัติโดย ใคร เมื่อไร" ใช้ทุกที่ที่แสดงใบลา */
+function decidedBy(a, st){
+  if (!a || !(a.by || a.at)) return '';
+  const verb = st === 'rejected' ? 'ไม่อนุมัติโดย' : 'อนุมัติโดย';
+  return `<div class="small" style="color:${st === 'rejected' ? 'var(--bad)' : 'var(--ok)'}">${verb} <b>${esc(name(a.by) || 'ผู้ดูแล')}</b>${a.at ? ` <span class="muted">· ${thDay(dKey(a.at))} ${hm(a.at)} น.</span>` : ''}${a.note ? ` <span class="muted">· “${esc(a.note)}”</span>` : ''}</div>`;
+}
 const breakChip = b => b ? `<span class="chip ${b.total >= 4 ? 'warn' : 'info'}" title="หยุดต่อเนื่อง ${b.total} วัน">${b.total >= 4 ? 'ติดวันหยุดยาว' : 'ติดวันหยุด'} · หยุดรวม ${b.total} วัน (${thDay(b.from)} – ${thDay(b.to)})${b.hol ? ' · มีวันหยุดนักขัตฤกษ์' : ''}</span>` : '';
 const busyThreshold = () => Math.max(3, Math.ceil(shown().length * 0.3));
 function teamBusy(list){ const by = {}; for (const it of list) by[it.team] = (by[it.team]||0) + 1;
@@ -780,7 +811,7 @@ function vCalendar(){
     detail = `<section class="card list" id="calDetail"><div class="row between"><div><h3>${thDay(d)}</h3>${S.hol[d] ? `<p class="sub">${esc(S.hol[d])}</p>` : ''}</div><button class="btn sm ghost" data-act="calDay" data-dk="${d}">ปิด</button></div>
       ${list.length ? `<div class="list">${list.map(it => `<div class="item"><div class="grow"><div class="t">${esc(name(it.uid))} <span class="small muted">· ${esc(it.team)}</span></div>
         <div class="small muted">${LT[it.L.type]||'ลา'}${it.half ? ' ครึ่งวัน' : ''} · ${thDate(it.L.from)}${it.L.to !== it.L.from ? ' – ' + thDate(it.L.to) : ''} (${leaveAmt(it.L)} วัน)</div>
-        ${it.L.reason ? `<div class="small">${esc(it.L.reason)}</div>` : ''}<div class="chips" style="margin-top:4px">${breakChip(longBreak(it.uid, it.L, it.lid))}</div></div>${stChip(it.st)}</div>`).join('')}</div>`
+        ${it.L.reason ? `<div class="small">${esc(it.L.reason)}</div>` : ''}${it.st === 'approved' ? decidedBy(((S.apv[it.uid]||{})[String(it.L.from).slice(0,4)]||{items:{}}).items[it.lid], it.st) : ''}<div class="chips" style="margin-top:4px">${breakChip(longBreak(it.uid, it.L, it.lid))}</div></div>${stChip(it.st)}</div>`).join('')}</div>`
         : '<div class="small muted">ไม่มีใครลาในวันนี้</div>'}</section>`;
   }
 
@@ -822,7 +853,7 @@ function vApprove(){
       ${x.s !== 'rejected' ? (b => b ? `<div class="chips" style="margin-top:4px">${breakChip(b)}</div>` : '')(longBreak(x.uid, x.L, x.lid)) : ''}
       ${x.s !== 'rejected' && payLine ? `<div class="small" style="${a && a.unpaid ? 'color:var(--warn)' : 'color:var(--muted)'}">${payLine}</div>` : ''}
       ${x.s==='pending' ? `<div class="small" style="color:${over ? 'var(--bad)' : 'var(--muted)'}">${capLine}${over ? ` · เกินสิทธิ์ ${over} วัน` : ''}</div>
-        <input id="an_${x.lid}" maxlength="160" placeholder="ข้อความถึงพนักงาน (ไม่บังคับ)" style="margin-top:8px;max-width:420px">` : `<div class="small muted">${x.a && x.a.by ? `โดย ${esc(name(x.a.by))}` : ''}${x.a && x.a.at ? ` · ${thDate(dKey(x.a.at))} ${hm(x.a.at)} น.` : ''}${x.a && x.a.note ? ` · ${esc(x.a.note)}` : ''}</div>`}</div>
+        <input id="an_${x.lid}" maxlength="160" placeholder="ข้อความถึงพนักงาน (ไม่บังคับ)" style="margin-top:8px;max-width:420px">` : decidedBy(x.a, x.s)}</div>
       <div class="row">${x.s==='pending' ? `<button class="btn sm ok" data-act="decide" data-st="approved" data-uid="${x.uid}" data-lid="${x.lid}">อนุมัติ</button><button class="btn sm bad" data-act="decide" data-st="rejected" data-uid="${x.uid}" data-lid="${x.lid}">ไม่อนุมัติ</button>` : stChip(x.s)}</div></div>`; };
   return `<div class="row between"><div><h2>รออนุมัติ</h2><p class="sub">ใบลาปี ${+S.year+543}</p></div><button class="btn sm" data-act="refresh">${S.adminLoading?'กำลังโหลด…':'โหลดข้อมูลล่าสุด'}</button></div>
   <div class="list">${pend.length ? pend.map(card).join('') : '<div class="card empty"><strong>ไม่มีใบลารออนุมัติ</strong>เมื่อพนักงานยื่นใบลา รายการจะขึ้นที่นี่</div>'}</div>
@@ -1162,7 +1193,11 @@ document.addEventListener('submit', async ev => {
 /* ---------- CSV ---------- */
 function exportCsv(kind){
   const mk = S.adminMonth; const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`; let lines = [];
-  if (kind === 'sum' && !attOn()){
+  if (kind === 'list'){
+    lines.push(['ตั้งแต่','ถึง','ชื่อ-นามสกุล','ทีม','อีเมล','ประเภท','ครึ่งวัน','จำนวนวัน','เหตุผล','สถานะ','ผู้อนุมัติ','อีเมลผู้อนุมัติ','อนุมัติเมื่อ','ข้อความผู้อนุมัติ','ยื่นเมื่อ'].map(q).join(','));
+    for (const x of leaveRows(mk)) lines.push([x.L.from, x.L.to, name(x.e.id), x.e.team, x.e.email, LT[x.L.type]||x.L.type, halfOf(x.L) === 0.5 ? 'ใช่' : '', leaveAmt(x.L), x.L.reason,
+      ST[x.st][0], x.a && x.a.by ? name(x.a.by) : '', (x.a && x.a.by) || '', x.a && x.a.at ? `${dKey(x.a.at)} ${hm(x.a.at)}` : '', (x.a && x.a.note) || '', x.L.createdAt ? `${dKey(x.L.createdAt)} ${hm(x.L.createdAt)}` : ''].map(q).join(','));
+  } else if (kind === 'sum' && !attOn()){
     const types = Object.keys(LV), y = mk.slice(0,4);
     lines.push(['ชื่อ-นามสกุล','ทีม','อีเมล', ...types.map(t => LV[t].n + '(วัน)'), 'ลารวมเดือนนี้(วัน)','ลาไม่ได้ค่าจ้าง(วัน)','ลาได้ค่าจ้างบางส่วน(วัน)','ลารวมทั้งปี(วัน)'].map(q).join(','));
     for (const e of shown()){ const {s} = sumFor(e.id, mk); const yr = usage((S.lv[e.id]||{})[y], (S.apv[e.id]||{})[y]);
@@ -1179,7 +1214,7 @@ function exportCsv(kind){
   }
   const blob = new Blob(['﻿' + lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `attendance-${kind==='sum'?'summary':'daily'}-${S.team||'all'}-${mk}.csv`;
+  a.download = `${kind==='list'?'leaves':'attendance-'+(kind==='sum'?'summary':'daily')}-${S.team||'all'}-${mk}.csv`;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
