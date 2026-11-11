@@ -145,6 +145,36 @@ tr.sel td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .notice{border:1px solid var(--line);border-left:3px solid var(--stamp);background:var(--surface);border-radius:8px;padding:14px 16px}
 .notice p{margin:4px 0 0;color:var(--muted)}
 .empty{text-align:center;padding:36px 16px;color:var(--muted)}
+/* ปฏิทินการลา */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.cal .h{background:var(--soft);font-size:12px;font-weight:600;color:var(--muted);padding:6px 4px;text-align:center}
+.cd{appearance:none;border:0;font:inherit;color:inherit;text-align:left;background:var(--surface);min-height:104px;padding:6px;display:flex;flex-direction:column;gap:3px;cursor:pointer;min-width:0}
+.cd:hover{background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+.cd.off{background:color-mix(in srgb,var(--soft) 70%,var(--surface))}
+.cd.blank{cursor:default;background:var(--bg)}
+.cd.busy{box-shadow:inset 0 3px 0 var(--warn)}
+.cd.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.cd:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.dn{font-family:var(--f-mono);font-size:13px;font-weight:600;align-self:flex-start;padding:0 6px;border-radius:99px;font-variant-numeric:tabular-nums}
+.cd.today .dn{background:var(--accent);color:var(--accent-ink)}
+.hol{font-size:11px;color:var(--info);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cn{font-size:12px;line-height:1.35;padding:1px 6px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:color-mix(in srgb,var(--stamp) 14%,transparent)}
+.cn.k-sick{background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.cn.k-vacation{background:color-mix(in srgb,var(--ok) 16%,transparent)}
+.cn.k-personal{background:color-mix(in srgb,var(--info) 16%,transparent)}
+.cn.pend{background:transparent;border:1px dashed var(--muted);color:var(--muted)}
+.more{font-size:11px;color:var(--muted)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.legend .cn{display:inline-block}
+.agenda{display:none;flex-direction:column;gap:8px}
+.ag{display:flex;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);align-items:flex-start}
+.ag.today{border-color:var(--accent)}
+.ag .d{min-width:74px;font-weight:600;font-size:13px}
+.ag .l{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.offnow{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.teamline{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px dashed var(--line)}
+.teamline:last-child{border-bottom:0}
+@media (max-width:640px){.cal{display:none}.agenda{display:flex}}
 .empty strong{display:block;color:var(--ink);font-family:var(--f-display);font-size:17px;margin-bottom:4px}
 .list{display:flex;flex-direction:column;gap:10px}
 .item{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
@@ -345,11 +375,11 @@ function restoreForm(o){ for (const [k,x] of Object.entries(o)){ if (k === '__f'
 function tabsList(){
   if (!attOn()){
     const t = [['leave','ลางาน']];
-    if (S.isAdmin) t.push(['report','รายงานการลา'],['approve','อนุมัติการลา'],['emps','พนักงาน'],['settings','ตั้งค่า']);
+    if (S.isAdmin) t.push(['calendar','ปฏิทิน'],['report','รายงานการลา'],['approve','อนุมัติการลา'],['emps','พนักงาน'],['settings','ตั้งค่า']);
     return t;
   }
   const t = [['punch','ลงเวลา'],['leave','ลางาน']];
-  if (S.isAdmin) t.push(['today','วันนี้'],['report','รายงานรายเดือน'],['approve','อนุมัติการลา'],['emps','พนักงาน'],['settings','ตั้งค่า']);
+  if (S.isAdmin) t.push(['today','วันนี้'],['calendar','ปฏิทิน'],['report','รายงานรายเดือน'],['approve','อนุมัติการลา'],['emps','พนักงาน'],['settings','ตั้งค่า']);
   return t;
 }
 function pendingCount(){ let n = 0; for (const e of S.emps){ const lv = (S.lv[e.id]||{})[S.year]; const ap = (S.apv[e.id]||{})[S.year]; for (const [lid,L] of Object.entries((lv&&lv.items)||{})) if (leaveStatus(lid,L,ap) === 'pending') n++; } return n; }
@@ -372,6 +402,7 @@ function body(){
     case 'today': return vToday();
     case 'report': return vReport();
     case 'approve': return vApprove();
+    case 'calendar': return S.isAdmin ? vCalendar() : vLeave();
     case 'settings': return vSettings();
     case 'emps': return S.isAdmin ? vEmps() : vPunch();
     default: return vPunch();
@@ -668,6 +699,105 @@ function vEmpForm(uid){
 }
 
 /* ---------- admin: approve ---------- */
+/* ---------- admin: calendar ---------- */
+const addDays = (dk, n) => new Date(dayDate(dk).getTime() + n * 864e5).toISOString().slice(0,10);
+const firstName = uid => { const e = empInfo(uid); return e.first || name(uid); };
+/* ใบลาที่อนุมัติแล้วหรือรออนุมัติ ของพนักงานที่แสดงอยู่ (ตามตัวกรองทีม) ในปี y */
+function calItems(y){
+  const out = [];
+  for (const e of shown()){
+    const lv = (S.lv[e.id]||{})[y], ap = (S.apv[e.id]||{})[y];
+    for (const [lid, L] of Object.entries((lv && lv.items) || {})){
+      const st = leaveStatus(lid, L, ap); if (st !== 'approved' && st !== 'pending') continue;
+      useSched(e.id); out.push({uid:e.id, lid, L, st, team:e.team || '–', half: halfOf(L) === 0.5, dates: leaveDates(L)});
+    }
+  }
+  return out;
+}
+const onDay = (items, d) => items.filter(it => it.dates.includes(d));
+/* วันหยุดต่อเนื่องที่ใบลานี้เชื่อมกับเสาร์-อาทิตย์ วันหยุด หรือวันลาอื่นของคนเดียวกัน */
+function longBreak(uid, L, lid){
+  const y = String(L.from).slice(0,4); const lv = (S.lv[uid]||{})[y], ap = (S.apv[uid]||{})[y];
+  const leaveSet = new Set();
+  useSched(uid);
+  for (const [id, x] of Object.entries((lv && lv.items) || {})){
+    const st = leaveStatus(id, x, ap);
+    if (id === lid || st === 'approved' || st === 'pending') for (const d of leaveDates(x)) leaveSet.add(d);
+  }
+  const off = d => !isWork(d) || leaveSet.has(d);
+  let a = L.from, b = L.to;
+  for (let i = 0; i < 40 && off(addDays(a, -1)); i++) a = addDays(a, -1);
+  for (let i = 0; i < 40 && off(addDays(b, 1)); i++) b = addDays(b, 1);
+  const days = (p, q) => Math.round((dayDate(q) - dayDate(p)) / 864e5) + 1;
+  const total = days(a, b); if (total <= days(L.from, L.to)) return null;
+  let hol = 0; for (let d = a; d <= b; d = addDays(d, 1)) if (S.hol[d]) hol++;
+  return {from:a, to:b, total, hol};
+}
+const breakChip = b => b ? `<span class="chip ${b.total >= 4 ? 'warn' : 'info'}" title="หยุดต่อเนื่อง ${b.total} วัน">${b.total >= 4 ? 'ติดวันหยุดยาว' : 'ติดวันหยุด'} · หยุดรวม ${b.total} วัน (${thDay(b.from)} – ${thDay(b.to)})${b.hol ? ' · มีวันหยุดนักขัตฤกษ์' : ''}</span>` : '';
+const busyThreshold = () => Math.max(3, Math.ceil(shown().length * 0.3));
+function teamBusy(list){ const by = {}; for (const it of list) by[it.team] = (by[it.team]||0) + 1;
+  return Object.entries(by).some(([t,n]) => { const size = shown().filter(e => (e.team||'–') === t).length; return n >= 2 && n / size >= 0.5; }); }
+const cn = it => `<span class="cn k-${esc(it.L.type)} ${it.st === 'pending' ? 'pend' : ''}" title="${esc(name(it.uid) + ' · ' + (LT[it.L.type]||'ลา') + (it.half ? ' ครึ่งวัน' : '') + (it.st === 'pending' ? ' · รออนุมัติ' : ''))}">${esc(firstName(it.uid))}${it.half ? ' ½' : ''}</span>`;
+
+function vCalendar(){
+  if (!S.emps.length) return noEmps();
+  const mk = S.calMonth || (S.calMonth = S.curMk); const y = mk.slice(0,4);
+  const td = dKey(Date.now()), tm = addDays(td, 1);
+  const items = calItems(y);
+  const tItems = td.slice(0,4) === y ? items : calItems(td.slice(0,4));
+  const tmItems = tm.slice(0,4) === td.slice(0,4) ? tItems : calItems(tm.slice(0,4));
+
+  // วันนี้ / พรุ่งนี้ใครหยุด
+  const offBox = (label, d, list) => {
+    const teams = [...new Set(shown().map(e => e.team || '–'))].sort((a,b) => { const i = t => { const k = TEAMS.indexOf(t); return k < 0 ? 99 : k; }; return i(a) - i(b); });
+    const lines = teams.map(t => { const size = shown().filter(e => (e.team||'–') === t).length; const off = list.filter(it => it.team === t);
+      if (!off.length) return '';
+      return `<div class="teamline"><span><b>${esc(t)}</b> · ${off.map(it => esc(name(it.uid)) + (it.half ? ' (½)' : '') + (it.st === 'pending' ? ' <span class="muted">(รออนุมัติ)</span>' : '')).join(', ')}</span><span class="mono" style="${off.length >= 2 && off.length / size >= 0.5 ? 'color:var(--warn)' : ''}">${off.length}/${size}</span></div>`; }).join('');
+    const hol = S.hol[d] ? `<span class="chip info">${esc(S.hol[d])}</span>` : (!S.cfg.workDays.includes(dowOf(d)) ? '<span class="chip">วันหยุดประจำสัปดาห์</span>' : '');
+    return `<div class="card list"><div class="row between"><h3>${label} <span class="small muted">${thDay(d)}</span></h3>${hol}</div>
+      ${list.length ? lines : `<div class="small muted">${hol ? 'วันหยุด' : 'ไม่มีใครลา'}</div>`}
+      ${list.length ? `<div class="small muted">ลา ${list.length} คน · ทำงาน ${Math.max(0, shown().length - list.filter(it => !it.half).length)} จาก ${shown().length} คน</div>` : ''}</div>`;
+  };
+
+  // ตารางรายเดือน
+  const nd = daysIn(mk); const first = dowOf(mk + '-01'); let cells = '', agenda = '';
+  for (let i = 0; i < first; i++) cells += '<div class="cd blank" aria-hidden="true"></div>';
+  for (let i = 1; i <= nd; i++){
+    const d = `${mk}-${pad(i)}`; const list = onDay(items, d);
+    const weekend = !S.cfg.workDays.includes(dowOf(d)); const hol = S.hol[d];
+    const busy = list.length >= busyThreshold() || teamBusy(list);
+    const shownList = list.slice(0, 4).map(cn).join('');
+    cells += `<button type="button" class="cd ${weekend || hol ? 'off' : ''} ${d === td ? 'today' : ''} ${S.calDay === d ? 'sel' : ''} ${busy ? 'busy' : ''}" data-act="calDay" data-dk="${d}" aria-label="${esc(thDay(d))} ลา ${list.length} คน">
+      <span class="dn">${i}</span>${hol ? `<span class="hol" title="${esc(hol)}">${esc(hol)}</span>` : ''}${shownList}${list.length > 4 ? `<span class="more">+ อีก ${list.length - 4} คน</span>` : ''}</button>`;
+    if (list.length || hol) agenda += `<div class="ag ${d === td ? 'today' : ''}"><div class="d">${thDay(d)}${busy ? '<div><span class="chip warn">ลาหลายคน</span></div>' : ''}</div><div class="l">${hol ? `<span class="hol">${esc(hol)}</span>` : ''}${list.map(it => `<span class="small">${cn(it)} <span class="muted">${esc(it.team)} · ${LT[it.L.type]||'ลา'}</span></span>`).join('')}</div></div>`;
+  }
+
+  for (let i = (7 - (first + nd) % 7) % 7; i > 0; i--) cells += '<div class="cd blank" aria-hidden="true"></div>';
+  // รายละเอียดวันที่เลือก
+  let detail = '';
+  if (S.calDay && S.calDay.startsWith(mk)){
+    const d = S.calDay; const list = onDay(items, d);
+    detail = `<section class="card list" id="calDetail"><div class="row between"><div><h3>${thDay(d)}</h3>${S.hol[d] ? `<p class="sub">${esc(S.hol[d])}</p>` : ''}</div><button class="btn sm ghost" data-act="calDay" data-dk="${d}">ปิด</button></div>
+      ${list.length ? `<div class="list">${list.map(it => `<div class="item"><div class="grow"><div class="t">${esc(name(it.uid))} <span class="small muted">· ${esc(it.team)}</span></div>
+        <div class="small muted">${LT[it.L.type]||'ลา'}${it.half ? ' ครึ่งวัน' : ''} · ${thDate(it.L.from)}${it.L.to !== it.L.from ? ' – ' + thDate(it.L.to) : ''} (${leaveAmt(it.L)} วัน)</div>
+        ${it.L.reason ? `<div class="small">${esc(it.L.reason)}</div>` : ''}<div class="chips" style="margin-top:4px">${breakChip(longBreak(it.uid, it.L, it.lid))}</div></div>${stChip(it.st)}</div>`).join('')}</div>`
+        : '<div class="small muted">ไม่มีใครลาในวันนี้</div>'}</section>`;
+  }
+
+  const nav = `<div class="monthnav"><button class="btn sm" data-act="calMonth" data-n="-1" aria-label="เดือนก่อน">‹</button><span class="lbl">${thMonth(mk)}</span><button class="btn sm" data-act="calMonth" data-n="1" aria-label="เดือนถัดไป">›</button>${mk !== S.curMk ? '<button class="btn sm ghost" data-act="calMonth" data-n="0">เดือนนี้</button>' : ''}</div>`;
+  const monthCount = items.filter(it => it.dates.some(d => d.startsWith(mk))).length;
+  return `<div class="row between"><div><h2>ปฏิทินการลา</h2><p class="sub">ใบลาที่อนุมัติแล้วและรออนุมัติ${S.adminAt ? ` · ข้อมูลเมื่อ ${hm(S.adminAt)} น.` : ''}</p></div>
+    <div class="row">${teamFilter()}<button class="btn sm" data-act="refresh">${S.adminLoading ? 'กำลังโหลด…' : 'โหลดข้อมูลล่าสุด'}</button></div></div>
+  <div class="offnow">${offBox('วันนี้ใครหยุด', td, onDay(tItems, td))}${offBox('พรุ่งนี้', tm, onDay(tmItems, tm))}</div>
+  <section class="list">
+    <div class="row between">${nav}<span class="small muted">ใบลาในเดือนนี้ ${monthCount} ใบ</span></div>
+    <div class="cal">${DOW1.map(x => `<div class="h">${x}</div>`).join('')}${cells}</div>
+    <div class="agenda">${agenda || '<div class="card empty"><strong>ไม่มีการลาในเดือนนี้</strong></div>'}</div>
+    <div class="legend"><span class="cn k-sick">ลาป่วย</span><span class="cn k-personal">ลากิจ</span><span class="cn k-vacation">ลาพักร้อน</span><span class="cn">ลาประเภทอื่น</span><span class="cn pend">รออนุมัติ</span><span>½ = ครึ่งวัน</span><span><span style="display:inline-block;width:14px;height:3px;background:var(--warn);vertical-align:middle"></span> ลาหลายคนในวันเดียว</span></div>
+  </section>
+  ${detail}`;
+}
+
 function vApprove(){
   if (!S.emps.length) return noEmps();
   const pend = [], done = [];
@@ -689,6 +819,7 @@ function vApprove(){
     return `<div class="item"><div class="grow"><div class="t">${esc(name(x.uid))} · ${LT[x.L.type]||'ลา'} ${leaveAmt(x.L)} วัน <span class="law">${ldef(x.L.type).law}</span></div>
       <div class="small muted mono">${thDate(x.L.from)}${x.L.to!==x.L.from?' – '+thDate(x.L.to):''}${x.L.half&&x.L.from===x.L.to?' (ครึ่งวัน)':''}</div>
       ${x.L.reason?`<div class="small">${esc(x.L.reason)}</div>`:''}
+      ${x.s !== 'rejected' ? (b => b ? `<div class="chips" style="margin-top:4px">${breakChip(b)}</div>` : '')(longBreak(x.uid, x.L, x.lid)) : ''}
       ${x.s !== 'rejected' && payLine ? `<div class="small" style="${a && a.unpaid ? 'color:var(--warn)' : 'color:var(--muted)'}">${payLine}</div>` : ''}
       ${x.s==='pending' ? `<div class="small" style="color:${over ? 'var(--bad)' : 'var(--muted)'}">${capLine}${over ? ` · เกินสิทธิ์ ${over} วัน` : ''}</div>
         <input id="an_${x.lid}" maxlength="160" placeholder="ข้อความถึงพนักงาน (ไม่บังคับ)" style="margin-top:8px;max-width:420px">` : `<div class="small muted">${x.a && x.a.by ? `โดย ${esc(name(x.a.by))}` : ''}${x.a && x.a.at ? ` · ${thDate(dKey(x.a.at))} ${hm(x.a.at)} น.` : ''}${x.a && x.a.note ? ` · ${esc(x.a.note)}` : ''}</div>`}</div>
@@ -754,7 +885,7 @@ function tick(){
 setInterval(tick, 1000);
 let lastDay = dKey(Date.now()); setInterval(() => { const d = dKey(Date.now()); if (d !== lastDay){ lastDay = d; render(); } }, 30000);
 /* ผู้ดูแล: โหลดข้อมูลใหม่ทุก 2 นาทีเมื่อเปิดแท็บผู้ดูแลค้างไว้ */
-setInterval(() => { if (S.isAdmin && !document.hidden && ['today','report','approve','emps'].includes(S.tab) && !S.edit && !S.empEdit) loadAdmin(true); }, 120000);
+setInterval(() => { if (S.isAdmin && !document.hidden && ['today','calendar','report','approve','emps'].includes(S.tab) && !S.edit && !S.empEdit) loadAdmin(true); }, 120000);
 
 /* ---------- API (Google Apps Script) ---------- */
 let OWNER_LIST = [];
@@ -878,7 +1009,7 @@ document.addEventListener('click', async ev => {
   if (a === 'copyLink'){ try { await navigator.clipboard.writeText(location.href); toast('คัดลอกลิงก์แล้ว'); } catch(_){ toast(location.href); } return; }
   if (a === 'retry'){ S.loadErr = null; render(); return loadMine(); }
   if (a === 'tab'){ S.tab = b.dataset.tab; try { localStorage.setItem('ta_tab', S.tab); } catch(_){} render();
-    if (S.isAdmin && ['today','report','approve','emps'].includes(S.tab) && !S.adminLoading && (!S.adminAt || Date.now() - S.adminAt > 60000)) loadAdmin(true);
+    if (S.isAdmin && ['today','calendar','report','approve','emps'].includes(S.tab) && !S.adminLoading && (!S.adminAt || Date.now() - S.adminAt > 60000)) loadAdmin(true);
     return; }
   if (a === 'punch') return punch(b.dataset.kind);
   if (a === 'myMonth'){
@@ -886,6 +1017,8 @@ document.addEventListener('click', async ev => {
     if (mk !== S.curMk && S.myOther[mk] === undefined){ try { S.myOther[mk] = await api('myMonth', {month:mk}); } catch(e){ S.myOther[mk] = {days:{}}; toast(dbErr(e)); } render(); }
     return;
   }
+  if (a === 'calMonth'){ const n = +b.dataset.n; S.calMonth = n === 0 ? S.curMk : shiftMonth(S.calMonth || S.curMk, n); S.calDay = null; return render(); }
+  if (a === 'calDay'){ S.calDay = S.calDay === b.dataset.dk ? null : b.dataset.dk; await render(); const d = $('#calDetail'); if (d) d.scrollIntoView({behavior:'smooth', block:'nearest'}); return; }
   if (a === 'adMonth'){
     const mk = shiftMonth(S.adminMonth, +b.dataset.n); if (mk > S.curMk) return; S.adminMonth = mk; S.edit = null; render();
     if (S.emps.some(e => (S.m[e.id]||{})[mk] === undefined)){
