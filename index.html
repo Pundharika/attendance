@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0f5e63">
-<title>ลงเวลาการทำงานของจ้างเหมาบริการ ศูนย์การแพทย์จีโนมิกส์</title>
+<title>ระบบบันทึกการลางานของจ้างเหมาบริการ ศูนย์การแพทย์จีโนมิกส์</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f5e63'/%3E%3Ctext x='16' y='21' font-family='monospace' font-size='12' font-weight='700' fill='white' text-anchor='middle'%3EIN%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -163,7 +163,7 @@ tr.sel td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 <header>
   <div class="wrap">
     <div class="hrow">
-      <div class="brand"><div class="mark">IN</div><div class="bt">ลงเวลาการทำงานของจ้างเหมาบริการ<small>ศูนย์การแพทย์จีโนมิกส์</small></div></div>
+      <div class="brand"><div class="mark">IN</div><div class="bt">ระบบบันทึกการลางานของจ้างเหมาบริการ<small>ศูนย์การแพทย์จีโนมิกส์</small></div></div>
       <div class="who" id="who"></div>
     </div>
     <nav class="tabs" id="tabs" role="tablist"></nav>
@@ -221,6 +221,8 @@ const DOWS = ['อาทิตย์','จันทร์','อังคาร',
 const DEF = {start:'08:30', end:'17:30', breakMin:60, graceMin:5, otMin:30, workDays:[1,2,3,4,5], holidays:''};
 const mergeCfg = d => { d = d || {}; const lv = {}; for (const k of Object.keys(LV)) lv[k] = {...DEF_LEAVE[k], ...((d.leave && d.leave[k]) || {})};
   return {...DEF, ...d, leave:lv, workDays: Array.isArray(d.workDays) ? d.workDays : DEF.workDays}; };
+/* เปิด/ปิดการลงเวลา (ค่าเริ่มต้น: ปิด ใช้เฉพาะระบบลา) */
+const attOn = () => !!(S.cfg && S.cfg.attendance);
 const lim = v => v === null || v === undefined || v === '' ? Infinity : +v;
 const lcfg = t => S.cfg.leave[t] || S.cfg.leave.other;
 const ldef = t => LV[t] || LV.other;
@@ -341,6 +343,11 @@ function restoreForm(o){ for (const [k,x] of Object.entries(o)){ if (k === '__f'
   const std = document.getElementById('mStd'), own = document.getElementById('mOwn'); if (std && own) own.hidden = std.checked; }
 
 function tabsList(){
+  if (!attOn()){
+    const t = [['leave','ลางาน']];
+    if (S.isAdmin) t.push(['report','รายงานการลา'],['approve','อนุมัติการลา'],['emps','พนักงาน'],['settings','ตั้งค่า']);
+    return t;
+  }
   const t = [['punch','ลงเวลา'],['leave','ลางาน']];
   if (S.isAdmin) t.push(['today','วันนี้'],['report','รายงานรายเดือน'],['approve','อนุมัติการลา'],['emps','พนักงาน'],['settings','ตั้งค่า']);
   return t;
@@ -355,10 +362,11 @@ function renderHeader(){
 function body(){
   if (S.err === 'config') return notice('ยังไม่ได้ตั้งค่าระบบ', 'เปิดไฟล์ config.js แล้ววาง API_URL (ลิงก์ Web app ของ Apps Script) และ CLIENT_ID ตามคู่มือ');
   if (S.err === 'inapp') return `<div class="card signin"><h2>เปิดในเบราว์เซอร์ก่อน</h2><p class="sub">Google ไม่อนุญาตให้เข้าสู่ระบบจากแอป LINE หรือ Facebook กดเมนู ⋯ มุมขวาบน แล้วเลือก "เปิดในเบราว์เซอร์" (Chrome หรือ Safari)</p><button class="btn" data-act="copyLink">คัดลอกลิงก์</button></div>`;
-  if (S.err === 'signin') return `<div class="card signin"><div class="brand"><div class="mark">IN</div></div><h2>เข้าสู่ระบบเพื่อลงเวลา</h2>
-    <p class="sub">${S.expired ? 'การเข้าสู่ระบบหมดอายุ กดเข้าสู่ระบบอีกครั้ง' : 'ใช้บัญชี Google ของคุณเอง ระบบจะบันทึกเวลาในชื่อบัญชีนี้เท่านั้น จึงลงเวลาแทนกันไม่ได้'}</p>
+  if (S.err === 'signin') return `<div class="card signin"><div class="brand"><div class="mark">IN</div></div><h2>เข้าสู่ระบบ</h2>
+    <p class="sub">${S.expired ? 'การเข้าสู่ระบบหมดอายุ กดเข้าสู่ระบบอีกครั้ง' : 'ใช้บัญชี Google ของคุณเอง ระบบจะบันทึกข้อมูลในชื่อบัญชีนี้เท่านั้น จึงทำรายการแทนกันไม่ได้'}</p>
     <div id="gbtn" style="min-height:44px"></div></div>`;
   if (!S.uid) return loading();
+  if (!tabsList().some(t => t[0] === S.tab)){ S.tab = tabsList()[0][0]; renderHeader(); }
   switch (S.tab){
     case 'leave': return vLeave();
     case 'today': return vToday();
@@ -376,7 +384,7 @@ const loading = () => S.loadErr ? `<div class="notice"><h3>โหลดข้อ
 function vRegister(){
   return `<div class="card" style="max-width:520px">
     <h2>ลงทะเบียนพนักงาน</h2>
-    <p class="sub">ทำครั้งเดียว ระบบจะผูกการลงเวลาทั้งหมดกับบัญชีที่คุณใช้เปิดหน้านี้ คนอื่นจึงลงเวลาแทนคุณไม่ได้</p>
+    <p class="sub">ทำครั้งเดียว ระบบจะผูกใบลาและข้อมูลทั้งหมดกับบัญชี Google ที่คุณเข้าสู่ระบบ คนอื่นจึงทำรายการแทนคุณไม่ได้</p>
     <form id="fReg" class="list" style="margin-top:14px">
       <div class="grid">
         <label class="f">ชื่อ<input id="rFirst" required maxlength="60" placeholder="ชื่อจริง" autocomplete="given-name"></label>
@@ -557,7 +565,27 @@ function noEmps(){
 
 /* ---------- admin: report ---------- */
 function sumFor(uid, mk){ useSched(uid); const lm = leaveMapFor((S.lv[uid]||{})[mk.slice(0,4)], (S.apv[uid]||{})[mk.slice(0,4)], mk); return {lm, s: monthSum((S.m[uid]||{})[mk], lm, mk)}; }
+function vReportLeave(){
+  if (!S.emps.length) return noEmps();
+  const mk = S.adminMonth, y = mk.slice(0,4); const types = Object.keys(LV); let tot = {leave:0, unpaid:0, people:0};
+  const rows = shown().map(e => {
+    const {s} = sumFor(e.id, mk); const yr = usage((S.lv[e.id]||{})[y], (S.apv[e.id]||{})[y]); const yTot = types.reduce((a,t) => a + (yr[t] ? yr[t].used : 0), 0);
+    tot.leave += s.leave; tot.unpaid += s.unpaid; if (s.leave) tot.people++;
+    return `<tr><td>${esc(name(e.id))}</td><td>${esc(e.team||'–')}</td>${types.map(t => `<td class="num">${s.byType[t]||'–'}</td>`).join('')}
+      <td class="num"><b>${s.leave||'–'}</b></td><td class="num" style="${s.unpaid?'color:var(--warn)':''}">${s.unpaid||'–'}</td><td class="num muted">${yTot||'–'}</td></tr>`;
+  }).join('');
+  return `<div class="row between"><div><h2>รายงานการลา</h2><p class="sub">นับเฉพาะใบลาที่อนุมัติแล้ว · ${thMonth(mk)}</p></div>
+    <div class="row">${teamFilter()}${monthNav('adMonth', mk)}<button class="btn sm" data-act="csv" data-kind="sum">ส่งออก CSV</button></div></div>
+  <div class="tiles">
+    <div class="tile"><div class="k">วันลารวมเดือนนี้</div><div class="v">${tot.leave}<small>วัน</small></div></div>
+    <div class="tile"><div class="k">จำนวนคนที่ลา</div><div class="v">${tot.people}<small>คน</small></div></div>
+    <div class="tile ${tot.unpaid?'warn':''}"><div class="k">ลาไม่ได้ค่าจ้าง</div><div class="v">${tot.unpaid}<small>วัน</small></div></div>
+    <div class="tile ${pendingCount()?'warn':''}"><div class="k">รออนุมัติ</div><div class="v">${pendingCount()}<small>ใบ</small></div></div>
+  </div>
+  <div class="tbl"><table><thead><tr><th>ชื่อ-นามสกุล</th><th>ทีม</th>${types.map(t => `<th class="num">${esc(LV[t].n)}</th>`).join('')}<th class="num">รวมเดือนนี้</th><th class="num">ไม่ได้ค่าจ้าง</th><th class="num">รวมทั้งปี ${+y+543}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 function vReport(){
+  if (!attOn()) return vReportLeave();
   if (!S.emps.length) return noEmps();
   const mk = S.adminMonth; let tot = {worked:0, ot:0, lateN:0, absent:0};
   const rows = shown().map(e => {
@@ -674,7 +702,12 @@ function vApprove(){
 function vSettings(){
   const c = S.cfg;
   return `<form id="fCfg" class="list">
+  <section class="card list"><h3>การลงเวลาเข้า-ออกงาน</h3>
+    <label class="chk"><input type="checkbox" id="sAtt" ${c.attendance?'checked':''}> เปิดใช้การลงเวลาเข้า-ออกงาน</label>
+    <p class="small muted" style="margin:0">ปิดอยู่: พนักงานเห็นเฉพาะแท็บลางาน และระบบไม่รับการลงเวลา · เปิด: เพิ่มแท็บลงเวลา วันนี้ และรายงานชั่วโมงทำงาน ข้อมูลการลาเดิมยังอยู่ครบ</p>
+  </section>
   <section class="card list"><h3>เวลางาน</h3>
+    <p class="small muted" style="margin:0">วันทำงานใช้นับจำนวนวันลา ส่วนเวลาเข้า-เลิกงาน ผ่อนผันสาย และโอที ใช้เมื่อเปิดการลงเวลา</p>
     <div class="grid">
       <label class="f">เวลาเข้างาน<input type="time" id="sStart" value="${esc(c.start)}" required></label>
       <label class="f">เวลาเลิกงาน<input type="time" id="sEnd" value="${esc(c.end)}" required></label>
@@ -741,7 +774,7 @@ async function api(action, args){
 const ERR = {
   network:'ไม่มีการเชื่อมต่ออินเทอร์เน็ต ลองใหม่อีกครั้ง', server:'เซิร์ฟเวอร์ไม่ตอบสนอง ลองใหม่อีกครั้ง', auth:'กรุณาเข้าสู่ระบบอีกครั้ง', forbidden:'บัญชีนี้ไม่มีสิทธิ์ทำรายการนี้',
   already_in:'วันนี้บันทึกเวลาเข้างานไปแล้ว', no_in:'ยังไม่ได้บันทึกเวลาเข้างานวันนี้', not_registered:'ลงทะเบียนก่อนใช้งาน', already_registered:'บัญชีนี้ลงทะเบียนแล้ว',
-  already_decided:'ใบลานี้ถูกพิจารณาแล้ว ยกเลิกไม่ได้', bad_dates:'ตรวจสอบวันที่ลาอีกครั้ง', bad_team:'เลือกทีมให้ถูกต้อง', name_required:'กรอกชื่อและนามสกุล', bad_schedule:'ตรวจสอบเวลางานและวันทำงาน',
+  already_decided:'ใบลานี้ถูกพิจารณาแล้ว ยกเลิกไม่ได้', bad_dates:'ตรวจสอบวันที่ลาอีกครั้ง', bad_team:'เลือกทีมให้ถูกต้อง', name_required:'กรอกชื่อและนามสกุล', bad_schedule:'ตรวจสอบเวลางานและวันทำงาน', attendance_off:'ระบบยังไม่เปิดใช้การลงเวลา',
 };
 function dbErr(e){ const c = e && e.code; return ERR[c] || ('ทำรายการไม่สำเร็จ' + (c ? ` (${c})` : '')); }
 
@@ -763,7 +796,6 @@ async function loadMine(){
     S.isAdmin = !!d.isAdmin; OWNER_LIST = d.owners || []; if (d.isAdmin) S.admins = d.admins || [];
     S.cfg = mergeCfg(d.cfg); parseHol(); S.me = d.me; S.names = d.names || {}; S.myCur = d.att || {days:{}}; setMyLeaves(d.leaves || []);
     S.slow = false;
-    if (!S.isAdmin && !['punch','leave'].includes(S.tab)) S.tab = 'punch';
     render();
     if (S.isAdmin && !S.adminLoaded) loadAdmin();
   } catch(e){ if (e.code !== 'auth'){ S.loadErr = dbErr(e); render(); } }
@@ -986,8 +1018,8 @@ document.addEventListener('submit', async ev => {
       const wd = DOWS.map((_,i) => $('#sW'+i).checked ? i : -1).filter(i => i >= 0);
       const num = id => { const v = $('#'+id).value.trim(); return v === '' ? null : Math.max(0, +v || 0); };
       const leave = {}; for (const k of Object.keys(LV)) leave[k] = {cap:num('sLc_'+k), paid:num('sLp_'+k), pay:Math.min(100, num('sLr_'+k) ?? 100)};
-      const cfg = {start:$('#sStart').value, end:$('#sEnd').value, breakMin:+$('#sBreak').value||0, graceMin:+$('#sGrace').value||0, otMin:+$('#sOt').value||0, workDays:wd, leave, holidays:$('#sHol').value.slice(0,8000)};
-      await api('saveCfg', {cfg}); S.cfg = mergeCfg(cfg); parseHol();
+      const cfg = {attendance:$('#sAtt').checked, start:$('#sStart').value, end:$('#sEnd').value, breakMin:+$('#sBreak').value||0, graceMin:+$('#sGrace').value||0, otMin:+$('#sOt').value||0, workDays:wd, leave, holidays:$('#sHol').value.slice(0,8000)};
+      await api('saveCfg', {cfg}); S.cfg = mergeCfg(cfg); parseHol(); renderHeader();
       toast('บันทึกการตั้งค่าแล้ว'); render();
     }
   } catch(e){ toast(dbErr(e)); }
@@ -997,7 +1029,12 @@ document.addEventListener('submit', async ev => {
 /* ---------- CSV ---------- */
 function exportCsv(kind){
   const mk = S.adminMonth; const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`; let lines = [];
-  if (kind === 'sum'){
+  if (kind === 'sum' && !attOn()){
+    const types = Object.keys(LV), y = mk.slice(0,4);
+    lines.push(['ชื่อ-นามสกุล','ทีม','อีเมล', ...types.map(t => LV[t].n + '(วัน)'), 'ลารวมเดือนนี้(วัน)','ลาไม่ได้ค่าจ้าง(วัน)','ลาได้ค่าจ้างบางส่วน(วัน)','ลารวมทั้งปี(วัน)'].map(q).join(','));
+    for (const e of shown()){ const {s} = sumFor(e.id, mk); const yr = usage((S.lv[e.id]||{})[y], (S.apv[e.id]||{})[y]);
+      lines.push([name(e.id), e.team, e.email, ...types.map(t => s.byType[t] || 0), s.leave, s.unpaid, s.halfPay, types.reduce((a,t) => a + (yr[t] ? yr[t].used : 0), 0)].map(q).join(',')); }
+  } else if (kind === 'sum'){
     const types = Object.keys(LV);
     lines.push(['ชื่อ-นามสกุล','ทีม','อีเมล','วันทำงาน','มาทำงาน','สาย(ครั้ง)','สาย(นาที)','ชั่วโมงทำงาน','โอที(ชม.)', ...types.map(t => LV[t].n + '(วัน)'), 'ลารวม(วัน)','ลาไม่ได้ค่าจ้าง(วัน)','ลาได้ค่าจ้างบางส่วน(วัน)','ขาด(วัน)','ลืมลงเวลาออก'].map(q).join(','));
     for (const e of shown()){ const {s} = sumFor(e.id, mk); lines.push([name(e.id), e.team, e.email, s.workdays, s.present, s.lateN, s.lateM, hrs(s.worked), hrs(s.ot), ...types.map(t => s.byType[t] || 0), s.leave, s.unpaid, s.halfPay, s.absent, s.missOut].map(q).join(',')); }
